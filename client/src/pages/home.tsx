@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Video, Loader2, CheckCircle2, AlertCircle, Copy, CheckCheck } from "lucide-react";
+import { Video, Loader2, CheckCircle2, AlertCircle, Copy, CheckCheck, ListTodo } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -107,9 +108,15 @@ ${ticket.severity ? `\n## Severity\n${ticket.severity.toUpperCase()}` : ''}`;
             <Video className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-semibold tracking-tight">Loom to Ticket</h1>
           </div>
-          <p className="text-muted-foreground text-base">
+          <p className="text-muted-foreground text-base mb-4">
             Transform Loom bug reports into structured tickets with AI
           </p>
+          <Link href="/session">
+            <Button variant="outline" size="sm" data-testid="button-session-mode">
+              <ListTodo className="mr-2 h-4 w-4" />
+              Session Analysis (Multiple Tickets)
+            </Button>
+          </Link>
         </header>
 
         <Card className="mb-8">

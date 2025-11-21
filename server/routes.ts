@@ -1,12 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { analyzeVideoFileForBugTicket, analyzeTranscriptForBugTicket } from "./gemini";
+import { analyzeSessionForTickets, analyzeSessionFromTranscript } from "./session-analyzer";
 import { getLoomVideoMetadata, isValidLoomUrl } from "./loom";
 import { extractLoomTranscript } from "./loom-scraper";
 import { downloadLoomVideo } from "./loom-video-downloader";
 import { loomUrlSchema } from "@shared/schema";
 
 const MAX_VIDEO_SIZE_FOR_ANALYSIS = 250 * 1024 * 1024;
+const MAX_SESSION_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB for longer sessions
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/analyze-video", async (req, res) => {
@@ -84,6 +86,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error in /api/analyze-video:", error);
       return res.status(500).json({
         error: error.message || "Failed to analyze video",
+      });
+    } finally {
+      if (downloadedVideo && downloadedVideo.cleanup) {
+        await downloadedVideo.cleanup();
+      }
+    }
+  });
+
+  app.post("/api/analyze-session", async (req, res) => {
+    let downloadedVideo: any = null;
+    
+    try {
+      const validationResult = loomUrlSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          error: "Invalid request",
+          details: validationResult.error.errors,
+        });
+      }
+
+      const { url, transcript: userTranscript } = validationResult.data;
+
+      if (!isValidLoomUrl(url)) {
+        return res.status(400).json({
+          error: "Invalid Loom URL. Please provide a valid Loom video URL.",
+        });
+      }
+
+      const metadata = await getLoomVideoMetadata(url);
+      let tickets;
+      let analysisMethod = "unknown";
+
+      // Try to extract transcript first (for timestamp accuracy)
+      let transcript = userTranscript;
+      if (!transcript || transcript.trim().length === 0) {
+        try {
+          transcript = await extractLoomTranscript(url);
+          console.log('Successfully extracted transcript for session analysis');
+        } catch (scrapeError: any) {
+          console.log('Could not extract transcript, will rely on video-only analysis');
+        }
+      }
+
+      try {
+        console.log("Attempting to download Loom video for session analysis...");
+        downloadedVideo = await downloadLoomVideo(url);
+        
+        if (downloadedVideo.sizeBytes <= MAX_SESSION_VIDEO_SIZE) {
+          console.log(`Video is ${(downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2)}MB, uploading to Gemini for session analysis...`);
+          const result = await analyzeSessionForTickets(
+            downloadedVideo.filePath,
+            transcript || "",
+            url
+          );
+          tickets = result.tickets;
+          analysisMethod = result.analysisMethod;
+          console.log(`Successfully analyzed session, found ${tickets.length} issue(s)`);
+        } else {
+          const sizeMB = (downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2);
+          console.log(`Video is too large (${sizeMB}MB > 500MB limit), falling back to transcript-only analysis`);
+          throw new Error("VIDEO_TOO_LARGE");
+        }
+      } catch (videoError: any) {
+        console.log("Video analysis not available, falling back to transcript-only:", videoError.message);
+        
+        if (!transcript || transcript.trim().length === 0) {
+          return res.status(400).json({
+            error: "Could not download video for analysis and no transcript available. Please provide the transcript manually or ensure the video is accessible.",
+          });
+        }
+
+        const result = await analyzeSessionFromTranscript(transcript, url);
+        tickets = result.tickets;
+        analysisMethod = result.analysisMethod;
+        console.log(`Successfully analyzed transcript, found ${tickets.length} issue(s)`);
+      }
+
+      return res.json({
+        tickets,
+        videoTitle: metadata.title,
+        videoDuration: metadata.duration,
+        analysisMethod,
+        totalIssuesFound: tickets.length,
+      });
+    } catch (error: any) {
+      console.error("Error in /api/analyze-session:", error);
+      return res.status(500).json({
+        error: error.message || "Failed to analyze session",
       });
     } finally {
       if (downloadedVideo && downloadedVideo.cleanup) {

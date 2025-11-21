@@ -22,6 +22,14 @@ export const ticketSchema = z.object({
 
 export type Ticket = z.infer<typeof ticketSchema>;
 
+export const timestampedTicketSchema = ticketSchema.extend({
+  timestampSeconds: z.number(),
+  timestampDisplay: z.string(),
+  loomUrlWithTimestamp: z.string().optional(),
+});
+
+export type TimestampedTicket = z.infer<typeof timestampedTicketSchema>;
+
 export const analyzeVideoResponseSchema = z.object({
   ticket: ticketSchema,
   videoTitle: z.string().optional(),
@@ -30,3 +38,13 @@ export const analyzeVideoResponseSchema = z.object({
 });
 
 export type AnalyzeVideoResponse = z.infer<typeof analyzeVideoResponseSchema>;
+
+export const analyzeSessionResponseSchema = z.object({
+  tickets: z.array(timestampedTicketSchema),
+  videoTitle: z.string().optional(),
+  videoDuration: z.string().optional(),
+  analysisMethod: z.enum(['video', 'transcript', 'combined']).optional(),
+  totalIssuesFound: z.number(),
+});
+
+export type AnalyzeSessionResponse = z.infer<typeof analyzeSessionResponseSchema>;
