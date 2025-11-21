@@ -1,15 +1,11 @@
-// Reference: javascript_gemini_ai_integrations blueprint
-// This is using Replit's AI Integrations service for Gemini API access
+// Reference: javascript_gemini blueprint
+// This uses the full Gemini API with Files API support for video uploads (up to 2GB)
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Ticket } from "@shared/schema";
 import fs from "fs";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
-  httpOptions: {
-    apiVersion: "",
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || "",
-  },
+  apiKey: process.env.GEMINI_API_KEY || "",
 });
 
 interface AnalysisResult {
@@ -67,12 +63,45 @@ export async function analyzeVideoFileForBugTicket(
   videoTitle?: string
 ): Promise<Ticket> {
   try {
-    console.log(`Reading video file for analysis: ${videoFilePath}`);
+    console.log(`Uploading video to Gemini Files API: ${videoFilePath}`);
     
-    const videoBuffer = fs.readFileSync(videoFilePath);
-    const videoBase64 = videoBuffer.toString('base64');
-    
-    console.log(`Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+    const stats = fs.statSync(videoFilePath);
+    const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+    console.log(`Video size: ${sizeMB}MB`);
+
+    const uploadResult = await ai.files.upload({
+      file: fs.createReadStream(videoFilePath),
+      config: {
+        mimeType,
+        displayName: `loom-bug-report-${Date.now()}.mp4`
+      }
+    });
+
+    const fileUri = uploadResult.uri;
+    console.log(`Video uploaded successfully. File URI: ${fileUri}`);
+    console.log(`Waiting for video to be processed...`);
+
+    let file = uploadResult;
+    let attempts = 0;
+    const maxAttempts = 60;
+    while (file.state === 'PROCESSING' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      file = await ai.files.get(file.name);
+      attempts++;
+      if (attempts % 5 === 0) {
+        console.log(`Still processing... (${attempts * 2}s elapsed)`);
+      }
+    }
+
+    if (file.state === 'FAILED') {
+      throw new Error('Video processing failed on Gemini servers');
+    }
+
+    if (file.state === 'PROCESSING') {
+      throw new Error('Video processing timed out. Video may be too long.');
+    }
+
+    console.log(`Video processed successfully. Analyzing with Gemini...`);
 
     const prompt = `You are analyzing a Loom screen recording video that shows someone encountering a bug in a piece of software.
 
@@ -99,9 +128,9 @@ Be specific and technical. Extract as much detail as possible from what you can 
           parts: [
             { text: prompt },
             { 
-              inlineData: { 
-                mimeType,
-                data: videoBase64
+              fileData: { 
+                fileUri,
+                mimeType 
               } 
             }
           ]
@@ -120,6 +149,14 @@ Be specific and technical. Extract as much detail as possible from what you can 
     }
 
     console.log("Successfully generated ticket from video analysis");
+    
+    try {
+      await ai.files.delete(file.name);
+      console.log("Cleaned up uploaded video from Gemini");
+    } catch (cleanupError) {
+      console.warn("Failed to cleanup video file from Gemini:", cleanupError);
+    }
+
     return result.ticket;
   } catch (error: any) {
     console.error("Error analyzing video file:", error);

@@ -6,7 +6,7 @@ import { extractLoomTranscript } from "./loom-scraper";
 import { downloadLoomVideo } from "./loom-video-downloader";
 import { loomUrlSchema } from "@shared/schema";
 
-const MAX_VIDEO_SIZE_FOR_ANALYSIS = 8 * 1024 * 1024;
+const MAX_VIDEO_SIZE_FOR_ANALYSIS = 250 * 1024 * 1024;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/analyze-video", async (req, res) => {
@@ -39,7 +39,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadedVideo = await downloadLoomVideo(url);
         
         if (downloadedVideo.sizeBytes <= MAX_VIDEO_SIZE_FOR_ANALYSIS) {
-          console.log(`Video is ${(downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2)}MB, analyzing with Gemini...`);
+          console.log(`Video is ${(downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2)}MB, uploading to Gemini Files API...`);
           ticket = await analyzeVideoFileForBugTicket(
             downloadedVideo.filePath,
             downloadedVideo.mimeType,
@@ -50,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Successfully analyzed video content");
         } else {
           const sizeMB = (downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2);
-          console.log(`Video is too large (${sizeMB}MB > 8MB limit), falling back to transcript analysis`);
+          console.log(`Video is too large (${sizeMB}MB > 250MB limit), falling back to transcript analysis`);
           throw new Error("VIDEO_TOO_LARGE");
         }
       } catch (videoError: any) {
@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (scrapeError: any) {
             console.error('Failed to extract transcript:', scrapeError.message);
             return res.status(400).json({
-              error: "Could not download video for analysis and no transcript available. Please provide the transcript manually or use a shorter video (under 8MB).",
+              error: "Could not download video for analysis and no transcript available. Please provide the transcript manually or ensure the video is accessible.",
             });
           }
         }
