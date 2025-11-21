@@ -67,10 +67,10 @@ export async function analyzeVideoFileForBugTicket(
     
     const stats = fs.statSync(videoFilePath);
     const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
-    console.log(`Video size: ${sizeMB}MB`);
+    console.log(`Video size: ${sizeMB}MB (${stats.size} bytes)`);
 
     const uploadResult = await ai.files.upload({
-      file: fs.createReadStream(videoFilePath),
+      file: videoFilePath,
       config: {
         mimeType,
         displayName: `loom-bug-report-${Date.now()}.mp4`
@@ -78,7 +78,9 @@ export async function analyzeVideoFileForBugTicket(
     });
 
     const fileUri = uploadResult.uri;
+    const fileName = uploadResult.name;
     console.log(`Video uploaded successfully. File URI: ${fileUri}`);
+    console.log(`File name: ${fileName}`);
     console.log(`Waiting for video to be processed...`);
 
     let file = uploadResult;
@@ -86,7 +88,7 @@ export async function analyzeVideoFileForBugTicket(
     const maxAttempts = 60;
     while (file.state === 'PROCESSING' && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      file = await ai.files.get(file.name);
+      file = await ai.files.get({ name: fileName });
       attempts++;
       if (attempts % 5 === 0) {
         console.log(`Still processing... (${attempts * 2}s elapsed)`);
@@ -101,7 +103,7 @@ export async function analyzeVideoFileForBugTicket(
       throw new Error('Video processing timed out. Video may be too long.');
     }
 
-    console.log(`Video processed successfully. Analyzing with Gemini...`);
+    console.log(`Video processed successfully (state: ${file.state}). Analyzing with Gemini...`);
 
     const prompt = `You are analyzing a Loom screen recording video that shows someone encountering a bug in a piece of software.
 
@@ -151,10 +153,10 @@ Be specific and technical. Extract as much detail as possible from what you can 
     console.log("Successfully generated ticket from video analysis");
     
     try {
-      await ai.files.delete(file.name);
-      console.log("Cleaned up uploaded video from Gemini");
-    } catch (cleanupError) {
-      console.warn("Failed to cleanup video file from Gemini:", cleanupError);
+      await ai.files.delete({ name: fileName });
+      console.log(`Cleaned up uploaded video from Gemini: ${fileName}`);
+    } catch (cleanupError: any) {
+      console.warn(`Failed to cleanup video file ${fileName} from Gemini:`, cleanupError.message);
     }
 
     return result.ticket;

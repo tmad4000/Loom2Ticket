@@ -116,7 +116,7 @@ ${ticket.severity ? `\n## Severity\n${ticket.severity.toUpperCase()}` : ''}`;
           <CardHeader>
             <CardTitle className="text-xl font-semibold">Video Analysis</CardTitle>
             <CardDescription className="text-sm">
-              Paste your Loom video URL to automatically extract and analyze the content with AI
+              Paste your Loom video URL. The system will download and analyze the actual video content (up to 250MB) using AI vision. Transcript is used as fallback if video is unavailable.
             </CardDescription>
           </CardHeader>
           <CardContent>

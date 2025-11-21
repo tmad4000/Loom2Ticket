@@ -88,9 +88,12 @@ export async function downloadLoomVideo(videoUrl: string): Promise<DownloadedVid
         maxBuffer: 10 * 1024 * 1024
       });
       output = stdout + stderr;
-      console.log('yt-dlp output:', output.substring(0, 500));
+      console.log('yt-dlp completed successfully');
+      console.log('Output:', output.substring(0, 500));
     } catch (execError: any) {
-      output = execError.stdout + execError.stderr;
+      output = (execError.stdout || '') + (execError.stderr || '');
+      console.log('yt-dlp exited with error code, checking if file was created...');
+      console.log('Error output:', output.substring(0, 500));
       
       if (execError.killed) {
         throw new Error('Video download timed out. The video may be too large or the connection is slow.');
@@ -104,9 +107,11 @@ export async function downloadLoomVideo(videoUrl: string): Promise<DownloadedVid
         throw new Error('Loom video not found. The video may have been deleted or the URL is incorrect.');
       }
       
-      if (!fs.existsSync(tempFilePath)) {
-        throw new Error(`yt-dlp failed: ${output.substring(0, 300)}`);
+      if (!fs.existsSync(tempFilePath) || fs.statSync(tempFilePath).size === 0) {
+        throw new Error(`yt-dlp failed to create valid video file: ${output.substring(0, 300)}`);
       }
+      
+      console.log('File was created successfully despite yt-dlp errors, continuing...');
     }
 
     if (!fs.existsSync(tempFilePath)) {
