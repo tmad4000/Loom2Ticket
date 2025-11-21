@@ -92,6 +92,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/test-download", async (req, res) => {
+    let downloadedVideo: any = null;
+    
+    try {
+      const { url } = req.body;
+
+      if (!url || !isValidLoomUrl(url)) {
+        return res.status(400).json({
+          error: "Invalid Loom URL. Please provide a valid Loom video URL.",
+        });
+      }
+
+      console.log(`\n===== TESTING VIDEO DOWNLOAD =====`);
+      console.log(`URL: ${url}`);
+      
+      downloadedVideo = await downloadLoomVideo(url);
+      
+      const sizeMB = (downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2);
+      const result = {
+        success: true,
+        videoInfo: {
+          filePath: downloadedVideo.filePath,
+          mimeType: downloadedVideo.mimeType,
+          sizeBytes: downloadedVideo.sizeBytes,
+          sizeMB: `${sizeMB} MB`,
+          isValidForGemini: downloadedVideo.mimeType.includes('video'),
+          canUseFilesAPI: true,
+        },
+        message: `Successfully downloaded Loom video (${sizeMB}MB). File is ready for Gemini Files API upload.`
+      };
+
+      console.log(`\n===== DOWNLOAD SUCCESS =====`);
+      console.log(`File: ${downloadedVideo.filePath}`);
+      console.log(`Type: ${downloadedVideo.mimeType}`);
+      console.log(`Size: ${sizeMB} MB (${downloadedVideo.sizeBytes.toLocaleString()} bytes)`);
+      console.log(`Valid for Gemini: ${result.videoInfo.isValidForGemini}`);
+      console.log(`===============================\n`);
+
+      return res.json(result);
+    } catch (error: any) {
+      console.error(`\n===== DOWNLOAD FAILED =====`);
+      console.error(`Error: ${error.message}`);
+      console.error(`===========================\n`);
+      
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        details: "Failed to download video. Check server logs for details."
+      });
+    } finally {
+      if (downloadedVideo && downloadedVideo.cleanup) {
+        await downloadedVideo.cleanup();
+      }
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
