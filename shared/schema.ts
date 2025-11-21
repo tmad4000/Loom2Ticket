@@ -26,6 +26,7 @@ export const analyzeVideoResponseSchema = z.object({
   ticket: ticketSchema,
   videoTitle: z.string().optional(),
   videoDuration: z.string().optional(),
+  analysisMethod: z.enum(['video', 'transcript', 'unknown']).optional(),
 });
 
 export type AnalyzeVideoResponse = z.infer<typeof analyzeVideoResponseSchema>;
