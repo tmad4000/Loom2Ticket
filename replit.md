@@ -2,9 +2,9 @@
 
 ## Overview
 
-Loom to Ticket is a web application that transforms Loom video transcripts into structured bug tickets using AI. Users submit a Loom video URL, and the application automatically extracts the video transcript, analyzes it with Google's Gemini AI, and generates a comprehensive bug ticket with title, description, steps to reproduce, expected/actual behavior, and severity level.
+Loom to Ticket is a web application that transforms Loom video recordings into structured bug tickets using AI vision analysis. Users submit a Loom video URL, and the application automatically downloads the video (up to 250MB), uploads it to Google's Gemini Files API, and analyzes the actual video content using Gemini 2.5 Flash with vision capabilities. The AI generates a comprehensive bug ticket with title, description, steps to reproduce, expected/actual behavior, environment details, and severity level based on what it observes in the video.
 
-The application focuses on developer productivity by converting informal video bug reports into formal, structured documentation that can be immediately used in issue tracking systems.
+The application focuses on developer productivity by converting informal video bug reports into formal, structured documentation that can be immediately used in issue tracking systems. Unlike transcript-only analysis, video analysis captures visual information like UI interactions, error messages, mouse movements, and environment details that text alone cannot convey.
 
 ## User Preferences
 
@@ -52,17 +52,21 @@ Preferred communication style: Simple, everyday language.
 
 **Core Services**:
 
-1. **Loom Integration** (`loom.ts`, `loom-scraper.ts`):
-   - Validates Loom URLs
-   - Fetches video metadata via Loom oEmbed API
-   - Extracts transcripts by scraping video page HTML
-   - Parses JSON-embedded transcript data from page source
+1. **Loom Integration** (`loom.ts`, `loom-scraper.ts`, `loom-video-downloader.ts`):
+   - Validates Loom URLs and fetches video metadata via Loom oEmbed API
+   - Downloads actual video files using `yt-dlp` (supports up to 250MB)
+   - Handles HLS streams, authentication, and format selection automatically
+   - Extracts transcripts by scraping video page HTML as fallback
+   - Enforces size limits and cleans up temporary files after processing
 
 2. **AI Analysis** (`gemini.ts`):
-   - Uses Google Gemini 2.5 Flash model via Replit AI Integrations service
-   - Structured output generation using type schemas
-   - Analyzes transcript to extract bug details systematically
-   - Generates title, description, reproduction steps, behaviors, and severity
+   - Uses Google Gemini 2.5 Flash model with **vision capabilities** via Gemini Files API
+   - Uploads video files to Gemini Files API and waits for processing
+   - Analyzes **actual video content** (visual UI, interactions, errors) not just text transcripts
+   - Structured output generation using type schemas for consistent ticket format
+   - Generates title, description, reproduction steps, expected/actual behavior, environment, and severity
+   - Properly cleans up uploaded videos from Gemini storage after analysis
+   - Falls back to transcript-only analysis if video download/upload fails
 
 3. **Storage** (`storage.ts`):
    - Memory-based storage implementation (placeholder for future database)
@@ -71,13 +75,23 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Flow
 
+**Primary Flow (Video Analysis)**:
 1. User submits Loom URL (with optional manual transcript)
 2. Backend validates URL format and Loom domain
-3. System attempts automatic transcript extraction via HTML scraping
-4. If extraction fails and no manual transcript provided, returns error
-5. Gemini AI analyzes transcript with structured prompt
-6. AI returns typed `Ticket` object with all required fields
-7. Frontend displays formatted ticket with copy functionality
+3. System downloads video file using yt-dlp to temporary storage (max 250MB)
+4. Video uploaded to Gemini Files API and polls until processing complete
+5. Gemini AI with vision analyzes actual video content using structured prompt
+6. AI returns typed `Ticket` object with all required fields based on visual observation
+7. System cleans up uploaded video from Gemini storage
+8. System deletes temporary video file from disk
+9. Frontend displays formatted ticket with `analysisMethod: "video"` indicator
+
+**Fallback Flow (Transcript-Only)**:
+1. If video download fails (private, oversized, unavailable), system attempts transcript extraction
+2. Scrapes video page HTML to extract transcript data
+3. If transcript available, Gemini analyzes text-only
+4. Frontend displays ticket with `analysisMethod: "transcript"` indicator
+5. If both video and transcript fail, returns error to user
 
 ### Type Safety & Validation
 
@@ -111,16 +125,21 @@ Preferred communication style: Simple, everyday language.
 
 ### Third-Party Services
 
-1. **Google Gemini AI** (via Replit AI Integrations):
-   - Model: `gemini-2.5-flash`
-   - Purpose: Natural language processing and structured data extraction
-   - Authentication: Environment variable `AI_INTEGRATIONS_GEMINI_API_KEY`
-   - Base URL: `AI_INTEGRATIONS_GEMINI_BASE_URL`
+1. **Google Gemini AI** (Full API with Files API):
+   - Model: `gemini-2.5-flash` with vision capabilities
+   - Purpose: **Multimodal video analysis** for visual bug detection and structured data extraction
+   - Files API: Uploads videos (up to 2GB supported, 250MB enforced), polls for ACTIVE state
+   - Video retention: 48 hours on Gemini servers (up to 20GB total storage)
+   - Authentication: Direct API key via `GEMINI_API_KEY` environment variable
+   - Base URL: `https://generativelanguage.googleapis.com/v1beta/`
+   - Cleanup: Automatically deletes uploaded videos after analysis to prevent quota exhaustion
 
-2. **Loom API**:
+2. **Loom API & Video Download**:
    - oEmbed endpoint for video metadata (title, duration, thumbnail)
-   - Public API, no authentication required
-   - HTML scraping as fallback for transcript extraction
+   - yt-dlp: Downloads actual MP4 video files from Loom CDN
+   - Supports HLS streams, automatic quality selection, and authentication handling
+   - Public API, no authentication required for public videos
+   - HTML scraping as fallback for transcript-only analysis
 
 ### Database
 
@@ -156,7 +175,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Environment Variables Required
 
-- `AI_INTEGRATIONS_GEMINI_API_KEY`: Gemini API authentication
-- `AI_INTEGRATIONS_GEMINI_BASE_URL`: Gemini service endpoint
+- `GEMINI_API_KEY`: Google Gemini API key for video analysis and Files API access (stored in Replit Secrets)
 - `DATABASE_URL`: PostgreSQL connection string (optional, not currently used)
 - `NODE_ENV`: Environment flag (`development` or `production`)
+
+**Note**: The application previously used Replit AI Integrations (`AI_INTEGRATIONS_GEMINI_API_KEY`) but now uses the full Gemini API with Files API support for video upload and multimodal analysis.
