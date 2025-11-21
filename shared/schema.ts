@@ -1,18 +1,31 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const loomUrlSchema = z.object({
+  url: z.string().url().refine(
+    (url) => url.includes('loom.com'),
+    { message: "Please provide a valid Loom video URL" }
+  ),
+  transcript: z.string().optional(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type LoomUrlInput = z.infer<typeof loomUrlSchema>;
+
+export const ticketSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  stepsToReproduce: z.array(z.string()),
+  expectedBehavior: z.string(),
+  actualBehavior: z.string(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  environment: z.string().optional(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type Ticket = z.infer<typeof ticketSchema>;
+
+export const analyzeVideoResponseSchema = z.object({
+  ticket: ticketSchema,
+  videoTitle: z.string().optional(),
+  videoDuration: z.string().optional(),
+});
+
+export type AnalyzeVideoResponse = z.infer<typeof analyzeVideoResponseSchema>;
