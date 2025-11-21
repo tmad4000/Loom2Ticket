@@ -135,7 +135,7 @@ ${transcript ? `\n\nTRANSCRIPT:\n${transcript}\n\nUse the transcript to help ide
 Return a JSON object with a "tickets" array containing all issues found. If no bugs are demonstrated, return an empty tickets array.`;
 
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       config: {
         responseMimeType: "application/json",
         responseSchema: timestampedTicketsSchema,
@@ -224,7 +224,7 @@ ${transcript}
 Return a JSON object with a "tickets" array containing all issues found. If no bugs are described, return an empty tickets array.`;
 
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       config: {
         responseMimeType: "application/json",
         responseSchema: timestampedTicketsSchema,
