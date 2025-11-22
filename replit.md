@@ -18,6 +18,34 @@ The application focuses on developer productivity by converting informal video b
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Improvements (November 2025)
+
+**Session Analysis UX Enhancements**:
+
+1. **Progress Tracking** ✅:
+   - Real-time progress messages during analysis (30-60 second operations)
+   - Staged updates: "Fetching video metadata..." → "Downloading video..." → "Uploading to AI..." → "AI is analyzing..." → "Extracting tickets..."
+   - Spinner icons for visual feedback
+   - Provides transparency during long-running video analysis
+
+2. **Error Display** ✅:
+   - Prominent red Alert component displays when analysis fails
+   - Shows "Analysis Failed" header with detailed error message
+   - Error state tracked separately from results
+   - More visible than toast-only notifications
+
+3. **Model Transparency** ✅:
+   - Badge displays which AI model was used for analysis
+   - Format: Sparkles icon + model name (e.g., "gemini-2.5-flash")
+   - Located in results header alongside video metadata
+   - Helps users understand which model analyzed their video
+
+4. **Simplified Model Selection**:
+   - Application uses gemini-2.5-flash (the best and only available model in Gemini v1beta API)
+   - Model selection dropdown removed after discovering only one model is available
+   - Cleaner, simpler UI without unnecessary options
+   - Backend always uses the best available model
+
 ## System Architecture
 
 ### Frontend Architecture
