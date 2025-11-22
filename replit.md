@@ -55,6 +55,17 @@ Preferred communication style: Simple, everyday language.
    - Helpful for testing and demonstrations
    - State persists across page navigation and browser sessions
 
+6. **Auto-Extraction of Video Metadata** ✅:
+   - Automatic extraction of video title and transcript when Loom URL is pasted
+   - 800ms debounce to prevent excessive API calls
+   - Lightweight `/api/fetch-loom-metadata` endpoint fetches data without full AI analysis
+   - **Loading State**: Shows "Extracting video information..." with spinner
+   - **Success State**: Displays video title and "Transcript extracted (N characters)" with green checkmark
+   - **Error State**: Shows red alert if transcript extraction fails (e.g., video has no captions)
+   - Auto-populated transcript used internally by backend for AI analysis
+   - New "Additional Notes" field allows users to add context separate from auto-extracted transcript
+   - Works on both single-ticket and session analysis pages
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -91,7 +102,10 @@ Preferred communication style: Simple, everyday language.
 - Production mode serves pre-built static assets
 
 **API Structure**:
-- RESTful endpoints: `POST /api/analyze-video` (single-ticket), `POST /api/analyze-session` (multi-ticket)
+- RESTful endpoints: 
+  - `POST /api/analyze-video` (single-ticket analysis)
+  - `POST /api/analyze-session` (multi-ticket session analysis)
+  - `POST /api/fetch-loom-metadata` (lightweight metadata extraction)
 - Request validation using Zod schemas shared between client and server
 - Error handling with descriptive messages
 
