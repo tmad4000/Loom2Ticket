@@ -1,5 +1,13 @@
 # Loom to Ticket - AI-Powered Bug Ticket Generator
 
+## Documentation Index
+
+This file contains technical architecture details for AI context. For other documentation, see:
+
+- **[README.md](README.md)**: Project overview, features, usage guide, and specifications
+- **[DEVELOPMENT.md](DEVELOPMENT.md)**: Developer guide with setup, architecture deep-dive, implementation stages, testing, and troubleshooting
+- **[design_guidelines.md](design_guidelines.md)**: UI/UX design specifications and component guidelines
+
 ## Overview
 
 Loom to Ticket is a web application that transforms Loom video recordings into structured bug tickets using AI vision analysis. Users submit a Loom video URL, and the application automatically downloads the video (up to 250MB), uploads it to Google's Gemini Files API, and analyzes the actual video content using Gemini 2.5 Flash with vision capabilities. The AI generates a comprehensive bug ticket with title, description, steps to reproduce, expected/actual behavior, environment details, and severity level based on what it observes in the video.
@@ -46,7 +54,7 @@ Preferred communication style: Simple, everyday language.
 - Production mode serves pre-built static assets
 
 **API Structure**:
-- RESTful endpoint: `POST /api/analyze-video`
+- RESTful endpoints: `POST /api/analyze-video` (single-ticket), `POST /api/analyze-session` (multi-ticket)
 - Request validation using Zod schemas shared between client and server
 - Error handling with descriptive messages
 
@@ -59,12 +67,14 @@ Preferred communication style: Simple, everyday language.
    - Extracts transcripts by scraping video page HTML as fallback
    - Enforces size limits and cleans up temporary files after processing
 
-2. **AI Analysis** (`gemini.ts`):
+2. **AI Analysis** (`gemini.ts`, `session-analyzer.ts`):
    - Uses Google Gemini 2.5 Flash model with **vision capabilities** via Gemini Files API
    - Uploads video files to Gemini Files API and waits for processing
    - Analyzes **actual video content** (visual UI, interactions, errors) not just text transcripts
    - Structured output generation using type schemas for consistent ticket format
    - Generates title, description, reproduction steps, expected/actual behavior, environment, and severity
+   - **Session Analysis**: Extracts multiple timestamped tickets from longer videos (up to 500MB)
+   - Generates Loom URLs with timestamp jump parameters (e.g., `?t=14s`)
    - Properly cleans up uploaded videos from Gemini storage after analysis
    - Falls back to transcript-only analysis if video download/upload fails
 
@@ -99,7 +109,9 @@ Preferred communication style: Simple, everyday language.
 - Zod schemas define contracts between client and server
 - `loomUrlSchema`: Validates input with URL format and Loom domain check
 - `ticketSchema`: Defines bug ticket structure with optional fields
-- `analyzeVideoResponseSchema`: Validates API response structure
+- `timestampedTicketSchema`: Extends ticket with timestamp fields and Loom jump URLs
+- `analyzeVideoResponseSchema`: Validates single-ticket API response structure
+- `analyzeSessionResponseSchema`: Validates multi-ticket session API response structure
 - Type inference ensures compile-time safety across codebase
 
 ### Configuration & Build
