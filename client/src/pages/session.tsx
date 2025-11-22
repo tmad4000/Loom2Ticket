@@ -12,15 +12,19 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
+import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2, Sparkles, Bug, FlaskConical } from "lucide-react";
 import { Link } from "wouter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useDebugMode } from "@/hooks/use-debug-mode";
+
+const SAMPLE_SESSION_VIDEO_URL = "https://www.loom.com/share/3648138453b14522bf66d85d21345ad5";
 
 export default function SessionPage() {
   const [result, setResult] = useState<AnalyzeSessionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string>("");
   const { toast } = useToast();
+  const { debugMode, toggleDebugMode } = useDebugMode();
 
   const form = useForm({
     resolver: zodResolver(loomUrlSchema),
@@ -75,6 +79,14 @@ export default function SessionPage() {
     analyzeMutation.mutate(data);
   };
 
+  const addSampleVideo = () => {
+    form.setValue("url", SAMPLE_SESSION_VIDEO_URL);
+    toast({
+      title: "Sample video added",
+      description: "Multi-ticket session sample URL has been added to the form",
+    });
+  };
+
   const getSeverityColor = (severity?: string) => {
     switch (severity) {
       case "critical":
@@ -126,11 +138,23 @@ ${ticket.loomUrlWithTimestamp ? `## Video Link\n${ticket.loomUrlWithTimestamp}` 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-4xl font-bold">Session Analysis</h1>
-            <Link href="/">
-              <Button variant="outline" data-testid="button-single-ticket">
-                Single Ticket Mode
+            <div className="flex items-center gap-2">
+              <Link href="/">
+                <Button variant="outline" data-testid="button-single-ticket">
+                  Single Ticket Mode
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleDebugMode}
+                data-testid="button-debug-toggle"
+                className="gap-2"
+              >
+                <FlaskConical className="h-4 w-4" />
+                {debugMode ? "Disable" : "Enable"} Debug
               </Button>
-            </Link>
+            </div>
           </div>
           <p className="text-muted-foreground text-lg">
             Analyze longer Loom sessions to extract multiple bug tickets with timestamps
@@ -161,6 +185,19 @@ ${ticket.loomUrlWithTimestamp ? `## Video Link\n${ticket.loomUrlWithTimestamp}` 
                         />
                       </FormControl>
                       <FormMessage />
+                      {debugMode && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addSampleVideo}
+                          data-testid="button-add-sample"
+                          className="mt-2 gap-2"
+                        >
+                          <Bug className="h-4 w-4" />
+                          Add Sample Video
+                        </Button>
+                      )}
                     </FormItem>
                   )}
                 />

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Video, Loader2, CheckCircle2, AlertCircle, Copy, CheckCheck, ListTodo } from "lucide-react";
+import { Video, Loader2, CheckCircle2, AlertCircle, Copy, CheckCheck, ListTodo, Bug, FlaskConical } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,12 +14,16 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { loomUrlSchema, type LoomUrlInput, type AnalyzeVideoResponse, type Ticket } from "@shared/schema";
+import { useDebugMode } from "@/hooks/use-debug-mode";
+
+const SAMPLE_SINGLE_VIDEO_URL = "https://www.loom.com/share/c09aec5b62fd4aab812fcbd8273b909a";
 
 export default function Home() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [videoTitle, setVideoTitle] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { debugMode, toggleDebugMode } = useDebugMode();
 
   const form = useForm<LoomUrlInput>({
     resolver: zodResolver(loomUrlSchema),
@@ -55,6 +59,14 @@ export default function Home() {
     setTicket(null);
     setVideoTitle("");
     analyzeVideo.mutate(data);
+  };
+
+  const addSampleVideo = () => {
+    form.setValue("url", SAMPLE_SINGLE_VIDEO_URL);
+    toast({
+      title: "Sample video added",
+      description: "Single-ticket sample URL has been added to the form",
+    });
   };
 
   const copyToClipboard = () => {
@@ -111,12 +123,24 @@ ${ticket.severity ? `\n## Severity\n${ticket.severity.toUpperCase()}` : ''}`;
           <p className="text-muted-foreground text-base mb-4">
             Transform Loom bug reports into structured tickets with AI
           </p>
-          <Link href="/session">
-            <Button variant="outline" size="sm" data-testid="button-session-mode">
-              <ListTodo className="mr-2 h-4 w-4" />
-              Session Analysis (Multiple Tickets)
+          <div className="flex items-center justify-center gap-2">
+            <Link href="/session">
+              <Button variant="outline" size="sm" data-testid="button-session-mode">
+                <ListTodo className="mr-2 h-4 w-4" />
+                Session Analysis (Multiple Tickets)
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleDebugMode}
+              data-testid="button-debug-toggle"
+              className="gap-2"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {debugMode ? "Disable" : "Enable"} Debug
             </Button>
-          </Link>
+          </div>
         </header>
 
         <Card className="mb-8">
@@ -147,6 +171,19 @@ ${ticket.severity ? `\n## Severity\n${ticket.severity.toUpperCase()}` : ''}`;
                         Enter the complete URL from your Loom video
                       </FormDescription>
                       <FormMessage data-testid="text-url-error" />
+                      {debugMode && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addSampleVideo}
+                          data-testid="button-add-sample"
+                          className="mt-2 gap-2"
+                        >
+                          <Bug className="h-4 w-4" />
+                          Add Sample Video
+                        </Button>
+                      )}
                     </FormItem>
                   )}
                 />
