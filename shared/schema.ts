@@ -6,7 +6,17 @@ export const loomUrlSchema = z.object({
     { message: "Please provide a valid Loom video URL" }
   ),
   transcript: z.string().optional(),
+  additionalNotes: z.string().optional(),
 });
+
+export const loomMetadataSchema = z.object({
+  title: z.string().optional(),
+  duration: z.string().optional(),
+  transcript: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export type LoomMetadata = z.infer<typeof loomMetadataSchema>;
 
 export type LoomUrlInput = z.infer<typeof loomUrlSchema>;
 

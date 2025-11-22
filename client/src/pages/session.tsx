@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loomUrlSchema, type AnalyzeSessionResponse, type TimestampedTicket } from "@shared/schema";
+import { loomUrlSchema, type AnalyzeSessionResponse, type TimestampedTicket, type LoomMetadata } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2, Sparkles, Bug, FlaskConical } from "lucide-react";
+import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2, Sparkles, Bug, FlaskConical, Video } from "lucide-react";
 import { Link } from "wouter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useDebugMode } from "@/hooks/use-debug-mode";
@@ -23,6 +23,8 @@ export default function SessionPage() {
   const [result, setResult] = useState<AnalyzeSessionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string>("");
+  const [extractedMetadata, setExtractedMetadata] = useState<LoomMetadata | null>(null);
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const { toast } = useToast();
   const { debugMode, toggleDebugMode } = useDebugMode();
 
@@ -31,8 +33,53 @@ export default function SessionPage() {
     defaultValues: {
       url: "",
       transcript: "",
+      additionalNotes: "",
     },
   });
+
+  const urlValue = form.watch("url");
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!urlValue || urlValue.trim().length === 0) {
+        setExtractedMetadata(null);
+        return;
+      }
+
+      try {
+        new URL(urlValue);
+        if (!urlValue.includes('loom.com')) {
+          return;
+        }
+      } catch {
+        return;
+      }
+
+      setIsFetchingMetadata(true);
+      setExtractedMetadata(null);
+
+      try {
+        const metadata = await apiRequest<LoomMetadata>("POST", "/api/fetch-loom-metadata", { url: urlValue });
+        setExtractedMetadata(metadata);
+        
+        if (metadata.transcript) {
+          form.setValue("transcript", metadata.transcript);
+        }
+        
+        if (metadata.error) {
+          console.log("Transcript extraction note:", metadata.error);
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch metadata:", error);
+        setExtractedMetadata({ error: error.message || "Failed to fetch video data" });
+      } finally {
+        setIsFetchingMetadata(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchMetadata, 800);
+    return () => clearTimeout(timeoutId);
+  }, [urlValue]);
 
   const analyzeMutation = useMutation({
     mutationFn: async (data: { url: string; transcript?: string }) => {
@@ -198,22 +245,62 @@ ${ticket.loomUrlWithTimestamp ? `## Video Link\n${ticket.loomUrlWithTimestamp}` 
                           Add Sample Video
                         </Button>
                       )}
+                      
+                      {isFetchingMetadata && (
+                        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground" data-testid="text-fetching-metadata">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Extracting video information...</span>
+                        </div>
+                      )}
+                      
+                      {extractedMetadata && !isFetchingMetadata && (
+                        <div className="mt-3 space-y-2">
+                          {extractedMetadata.title && (
+                            <div className="flex items-start gap-2 text-sm" data-testid="text-video-title">
+                              <Video className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                              <div>
+                                <span className="font-medium">Video: </span>
+                                <span>{extractedMetadata.title}</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {extractedMetadata.transcript && (
+                            <div className="flex items-start gap-2 text-sm text-green-600 dark:text-green-400" data-testid="text-transcript-success">
+                              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <span>Transcript extracted ({extractedMetadata.transcript.length} characters)</span>
+                            </div>
+                          )}
+                          
+                          {extractedMetadata.error && !extractedMetadata.transcript && (
+                            <Alert className="py-2" data-testid="alert-transcript-error">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription className="text-sm">
+                                {extractedMetadata.error}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
-
+                
                 <FormField
                   control={form.control}
-                  name="transcript"
+                  name="additionalNotes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Transcript (Optional)</FormLabel>
+                      <FormLabel>
+                        Additional Notes
+                        <span className="text-muted-foreground ml-1">(Optional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Textarea
                           {...field}
-                          placeholder="Paste transcript here if you have it (helps with timestamp accuracy)..."
+                          placeholder="Add any additional context, steps to reproduce, or observations about the bugs in this session..."
                           rows={4}
-                          data-testid="input-session-transcript"
+                          data-testid="input-additional-notes"
                         />
                       </FormControl>
                       <FormMessage />

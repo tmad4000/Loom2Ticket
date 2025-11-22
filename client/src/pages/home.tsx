@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { loomUrlSchema, type LoomUrlInput, type AnalyzeVideoResponse, type Ticket } from "@shared/schema";
+import { loomUrlSchema, type LoomUrlInput, type AnalyzeVideoResponse, type Ticket, type LoomMetadata } from "@shared/schema";
 import { useDebugMode } from "@/hooks/use-debug-mode";
 
 const SAMPLE_SINGLE_VIDEO_URL = "https://www.loom.com/share/c09aec5b62fd4aab812fcbd8273b909a";
@@ -22,6 +22,8 @@ export default function Home() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [videoTitle, setVideoTitle] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [extractedMetadata, setExtractedMetadata] = useState<LoomMetadata | null>(null);
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const { toast } = useToast();
   const { debugMode, toggleDebugMode } = useDebugMode();
 
@@ -30,8 +32,53 @@ export default function Home() {
     defaultValues: {
       url: "",
       transcript: "",
+      additionalNotes: "",
     },
   });
+
+  const urlValue = form.watch("url");
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!urlValue || urlValue.trim().length === 0) {
+        setExtractedMetadata(null);
+        return;
+      }
+
+      try {
+        new URL(urlValue);
+        if (!urlValue.includes('loom.com')) {
+          return;
+        }
+      } catch {
+        return;
+      }
+
+      setIsFetchingMetadata(true);
+      setExtractedMetadata(null);
+
+      try {
+        const metadata = await apiRequest<LoomMetadata>("POST", "/api/fetch-loom-metadata", { url: urlValue });
+        setExtractedMetadata(metadata);
+        
+        if (metadata.transcript) {
+          form.setValue("transcript", metadata.transcript);
+        }
+        
+        if (metadata.error) {
+          console.log("Transcript extraction note:", metadata.error);
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch metadata:", error);
+        setExtractedMetadata({ error: error.message || "Failed to fetch video data" });
+      } finally {
+        setIsFetchingMetadata(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchMetadata, 800);
+    return () => clearTimeout(timeoutId);
+  }, [urlValue]);
 
   const analyzeVideo = useMutation({
     mutationFn: async (data: LoomUrlInput) => {
@@ -184,35 +231,72 @@ ${ticket.severity ? `\n## Severity\n${ticket.severity.toUpperCase()}` : ''}`;
                           Add Sample Video
                         </Button>
                       )}
+                      
+                      {isFetchingMetadata && (
+                        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground" data-testid="text-fetching-metadata">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Extracting video information...</span>
+                        </div>
+                      )}
+                      
+                      {extractedMetadata && !isFetchingMetadata && (
+                        <div className="mt-3 space-y-2">
+                          {extractedMetadata.title && (
+                            <div className="flex items-start gap-2 text-sm" data-testid="text-video-title">
+                              <Video className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                              <div>
+                                <span className="font-medium">Video: </span>
+                                <span>{extractedMetadata.title}</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {extractedMetadata.transcript && (
+                            <div className="flex items-start gap-2 text-sm text-green-600 dark:text-green-400" data-testid="text-transcript-success">
+                              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <span>Transcript extracted ({extractedMetadata.transcript.length} characters)</span>
+                            </div>
+                          )}
+                          
+                          {extractedMetadata.error && !extractedMetadata.transcript && (
+                            <Alert className="py-2" data-testid="alert-transcript-error">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription className="text-sm">
+                                {extractedMetadata.error}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={form.control}
-                  name="transcript"
+                  name="additionalNotes"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">
-                        Video Transcript or Description
+                        Additional Notes
                         <span className="text-muted-foreground ml-1">(Optional)</span>
                       </FormLabel>
                       <FormControl>
                         <Textarea
-                          data-testid="input-transcript"
-                          placeholder="Optional: Paste the transcript or describe the bug if automatic extraction fails...
-
-Example: User clicks 'Submit' button, but nothing happens. Console shows error 'Cannot read property of undefined'. The form should submit data to the backend."
+                          data-testid="input-additional-notes"
+                          placeholder="Add any additional context, steps to reproduce, or observations that might help with the analysis..."
                           {...field}
-                          className="min-h-[120px] text-sm resize-y"
+                          className="min-h-[100px] text-sm resize-y"
                         />
                       </FormControl>
                       <FormDescription className="text-xs">
-                        The app will try to extract the transcript automatically. Provide it manually only if automatic extraction fails or for better accuracy.
+                        Provide extra details that might not be in the video or transcript
                       </FormDescription>
-                      <FormMessage data-testid="text-transcript-error" />
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <Button
                   data-testid="button-analyze"
                   type="submit"

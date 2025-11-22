@@ -11,6 +11,48 @@ const MAX_VIDEO_SIZE_FOR_ANALYSIS = 250 * 1024 * 1024;
 const MAX_SESSION_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB for longer sessions
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/fetch-loom-metadata", async (req, res) => {
+    try {
+      const { url } = req.body;
+
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({
+          error: "URL is required",
+        });
+      }
+
+      if (!isValidLoomUrl(url)) {
+        return res.status(400).json({
+          error: "Invalid Loom URL",
+        });
+      }
+
+      const metadata = await getLoomVideoMetadata(url);
+      let transcript: string | undefined;
+      let error: string | undefined;
+
+      try {
+        transcript = await extractLoomTranscript(url);
+        console.log('Successfully extracted transcript (length:', transcript.length, 'chars)');
+      } catch (transcriptError: any) {
+        console.log('Could not extract transcript:', transcriptError.message);
+        error = transcriptError.message || "Could not extract transcript";
+      }
+
+      return res.json({
+        title: metadata.title,
+        duration: metadata.duration,
+        transcript,
+        error,
+      });
+    } catch (error: any) {
+      console.error('Error fetching Loom metadata:', error);
+      return res.status(500).json({
+        error: error.message || "Failed to fetch video metadata",
+      });
+    }
+  });
+
   app.post("/api/analyze-video", async (req, res) => {
     let downloadedVideo: any = null;
     
