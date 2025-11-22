@@ -108,6 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { url, transcript: userTranscript } = validationResult.data;
+      const selectedModel = 'gemini-2.5-flash';
 
       if (!isValidLoomUrl(url)) {
         return res.status(400).json({
@@ -118,6 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metadata = await getLoomVideoMetadata(url);
       let tickets;
       let analysisMethod = "unknown";
+      let modelUsed = selectedModel;
 
       // Try to extract transcript first (for timestamp accuracy)
       let transcript = userTranscript;
@@ -139,10 +141,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const result = await analyzeSessionForTickets(
             downloadedVideo.filePath,
             transcript || "",
-            url
+            url,
+            selectedModel
           );
           tickets = result.tickets;
           analysisMethod = result.analysisMethod;
+          modelUsed = result.modelUsed;
           console.log(`Successfully analyzed session, found ${tickets.length} issue(s)`);
         } else {
           const sizeMB = (downloadedVideo.sizeBytes / 1024 / 1024).toFixed(2);
@@ -158,9 +162,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const result = await analyzeSessionFromTranscript(transcript, url);
+        const result = await analyzeSessionFromTranscript(transcript, url, selectedModel);
         tickets = result.tickets;
         analysisMethod = result.analysisMethod;
+        modelUsed = result.modelUsed;
         console.log(`Successfully analyzed transcript, found ${tickets.length} issue(s)`);
       }
 
@@ -170,6 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         videoDuration: metadata.duration,
         analysisMethod,
         totalIssuesFound: tickets.length,
+        modelUsed,
       });
     } catch (error: any) {
       console.error("Error in /api/analyze-session:", error);

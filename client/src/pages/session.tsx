@@ -12,11 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, ExternalLink, Clock, AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SessionPage() {
   const [result, setResult] = useState<AnalyzeSessionResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string>("");
   const { toast } = useToast();
 
   const form = useForm({
@@ -29,6 +32,15 @@ export default function SessionPage() {
 
   const analyzeMutation = useMutation({
     mutationFn: async (data: { url: string; transcript?: string }) => {
+      setError(null);
+      setProgress("Fetching video metadata...");
+      
+      // Simulate progress stages (actual progress comes from backend logs)
+      setTimeout(() => setProgress("Downloading video..."), 2000);
+      setTimeout(() => setProgress("Uploading to AI for analysis..."), 8000);
+      setTimeout(() => setProgress("AI is analyzing the video content..."), 15000);
+      setTimeout(() => setProgress("Extracting bug tickets with timestamps..."), 25000);
+      
       const response = await apiRequest<AnalyzeSessionResponse>(
         "POST",
         "/api/analyze-session",
@@ -38,21 +50,28 @@ export default function SessionPage() {
     },
     onSuccess: (data) => {
       setResult(data);
+      setProgress("");
+      setError(null);
       toast({
         title: "Analysis complete",
-        description: `Found ${data.totalIssuesFound} issue(s) in the session`,
+        description: `Found ${data.totalIssuesFound} issue(s) using ${data.modelUsed || 'AI'}`,
       });
     },
     onError: (error: Error) => {
+      setProgress("");
+      const errorMessage = error.message || "Failed to analyze session";
+      setError(errorMessage);
       toast({
         title: "Analysis failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: { url: string; transcript?: string }) => {
+    setResult(null);
+    setError(null);
     analyzeMutation.mutate(data);
   };
 
@@ -181,15 +200,29 @@ ${ticket.loomUrlWithTimestamp ? `## Video Link\n${ticket.loomUrlWithTimestamp}` 
                   )}
                 </Button>
 
-                {analyzeMutation.isPending && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    This may take 30-60 seconds for longer videos...
-                  </p>
+                {analyzeMutation.isPending && progress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{progress}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      This may take 30-60 seconds for longer videos...
+                    </p>
+                  </div>
                 )}
               </form>
             </Form>
           </CardContent>
         </Card>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Analysis Failed</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {result && (
           <div className="space-y-6">
@@ -198,13 +231,24 @@ ${ticket.loomUrlWithTimestamp ? `## Video Link\n${ticket.loomUrlWithTimestamp}` 
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>{result.videoTitle || "Session Analysis Results"}</CardTitle>
-                    <CardDescription>
-                      Found {result.totalIssuesFound} issue{result.totalIssuesFound !== 1 ? "s" : ""} •{" "}
-                      {result.videoDuration || "Unknown duration"} •{" "}
-                      <Badge variant="outline" className="ml-1">
+                    <CardDescription className="flex items-center gap-2 flex-wrap">
+                      <span>Found {result.totalIssuesFound} issue{result.totalIssuesFound !== 1 ? "s" : ""}</span>
+                      <span>•</span>
+                      <span>{result.videoDuration || "Unknown duration"}</span>
+                      <span>•</span>
+                      <Badge variant="outline">
                         {result.analysisMethod === "combined" ? "Video + Transcript" : 
                          result.analysisMethod === "video" ? "Video Only" : "Transcript Only"}
                       </Badge>
+                      {result.modelUsed && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="secondary" className="gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            {result.modelUsed}
+                          </Badge>
+                        </>
+                      )}
                     </CardDescription>
                   </div>
                 </div>

@@ -35,6 +35,7 @@ export const analyzeVideoResponseSchema = z.object({
   videoTitle: z.string().optional(),
   videoDuration: z.string().optional(),
   analysisMethod: z.enum(['video', 'transcript', 'unknown']).optional(),
+  modelUsed: z.string().optional(),
 });
 
 export type AnalyzeVideoResponse = z.infer<typeof analyzeVideoResponseSchema>;
@@ -45,6 +46,7 @@ export const analyzeSessionResponseSchema = z.object({
   videoDuration: z.string().optional(),
   analysisMethod: z.enum(['video', 'transcript', 'combined']).optional(),
   totalIssuesFound: z.number(),
+  modelUsed: z.string().optional(),
 });
 
 export type AnalyzeSessionResponse = z.infer<typeof analyzeSessionResponseSchema>;

@@ -56,8 +56,9 @@ const timestampedTicketsSchema = {
 export async function analyzeSessionForTickets(
   videoPath: string,
   transcript: string,
-  baseVideoUrl: string
-): Promise<SessionAnalysisResult> {
+  baseVideoUrl: string,
+  model: string = 'gemini-2.5-flash'
+): Promise<SessionAnalysisResult & { modelUsed: string }> {
   console.log("Starting session analysis with video and transcript...");
   console.log(`Video path: ${videoPath}`);
   console.log(`Transcript length: ${transcript.length} characters`);
@@ -134,8 +135,9 @@ ${transcript ? `\n\nTRANSCRIPT:\n${transcript}\n\nUse the transcript to help ide
 
 Return a JSON object with a "tickets" array containing all issues found. If no bugs are demonstrated, return an empty tickets array.`;
 
+    console.log(`Using AI model: ${model}`);
     const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: model,
       config: {
         responseMimeType: "application/json",
         responseSchema: timestampedTicketsSchema,
@@ -181,6 +183,7 @@ Return a JSON object with a "tickets" array containing all issues found. If no b
     return {
       tickets: ticketsWithUrls,
       analysisMethod: transcript ? 'combined' : 'video',
+      modelUsed: model,
     };
   } catch (error: any) {
     console.error("Error analyzing session:", error);
@@ -192,8 +195,9 @@ Return a JSON object with a "tickets" array containing all issues found. If no b
 
 export async function analyzeSessionFromTranscript(
   transcript: string,
-  baseVideoUrl: string
-): Promise<SessionAnalysisResult> {
+  baseVideoUrl: string,
+  model: string = 'gemini-2.5-flash'
+): Promise<SessionAnalysisResult & { modelUsed: string }> {
   console.log("Analyzing session from transcript only (no video)...");
   console.log(`Transcript length: ${transcript.length} characters`);
 
@@ -223,8 +227,9 @@ ${transcript}
 
 Return a JSON object with a "tickets" array containing all issues found. If no bugs are described, return an empty tickets array.`;
 
+    console.log(`Using AI model: ${model}`);
     const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: model,
       config: {
         responseMimeType: "application/json",
         responseSchema: timestampedTicketsSchema,
@@ -250,6 +255,7 @@ Return a JSON object with a "tickets" array containing all issues found. If no b
     return {
       tickets: ticketsWithUrls,
       analysisMethod: 'transcript',
+      modelUsed: model,
     };
   } catch (error: any) {
     console.error("Error analyzing session from transcript:", error);
