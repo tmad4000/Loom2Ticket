@@ -46,6 +46,15 @@ Preferred communication style: Simple, everyday language.
    - Cleaner, simpler UI without unnecessary options
    - Backend always uses the best available model
 
+5. **Debug Mode** ✅:
+   - Toggle-able debug mode using localStorage persistence
+   - Shows "Add Sample Video" button when enabled
+   - Different sample URLs for each mode:
+     - Home page (single-ticket): `https://www.loom.com/share/c09aec5b62fd4aab812fcbd8273b909a`
+     - Session page (multi-ticket): `https://www.loom.com/share/3648138453b14522bf66d85d21345ad5`
+   - Helpful for testing and demonstrations
+   - State persists across page navigation and browser sessions
+
 ## System Architecture
 
 ### Frontend Architecture
